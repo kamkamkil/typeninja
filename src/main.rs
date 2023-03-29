@@ -23,7 +23,7 @@ struct App {
 impl App {
     fn new() -> App {
         App {
-            text: String::from("hello world"),
+            text: String::from("HellO worlddd"),
             current_letter: 0,
         }
     }
@@ -33,10 +33,8 @@ impl App {
         let (typed, to_type) = self.text.split_at(self.current_letter);
 
         let row = row.push(Text::new(String::from(typed)).style(Color::from([1., 0.5, 0.5])));
+        let row = row.push(Text::new(String::from('|')).style(Color::from([0., 0., 0.])));
         let row = row.push(Text::new(String::from(to_type)).style(Color::from([0., 1., 0.5])));
-        // for letter in self.text.chars() {
-            // row = row.push(Text::new(String::from(letter)));
-        // }
         row
     }
 
@@ -45,7 +43,7 @@ impl App {
             KeyCode::A => 'a',
             KeyCode::B => 'b',
             KeyCode::C => 'c',
-            KeyCode::D => 'f',
+            KeyCode::D => 'd',
             KeyCode::E => 'e',
             KeyCode::F => 'f',
             KeyCode::G => 'g',
@@ -57,12 +55,12 @@ impl App {
             KeyCode::M => 'm',
             KeyCode::N => 'n',
             KeyCode::O => 'o',
-            KeyCode::P => 'p',
-            KeyCode::Q => 'q',
-            KeyCode::R => 'r',
-            KeyCode::S => 's',
-            KeyCode::T => 't',
             KeyCode::U => 'u',
+            KeyCode::R => 'r',
+            KeyCode::P => 'p',
+            KeyCode::S => 's',
+            KeyCode::Q => 'q',
+            KeyCode::T => 't',
             KeyCode::V => 'v',
             KeyCode::W => 'w',
             KeyCode::X => 'x',
@@ -97,9 +95,16 @@ impl Application for App {
                         key_code,
                         modifiers,
                     } => {
-                        if App::get_key_code(key_code)
-                            == self.text.chars().nth(self.current_letter).unwrap()
+                        let letter = self.text.chars().nth(self.current_letter).unwrap();
+                        if App::get_key_code(key_code) == letter
+                            && !keyboard::Modifiers::shift(modifiers)
                         {
+                            self.current_letter += 1;
+                        } else if letter.is_uppercase()
+                            && keyboard::Modifiers::shift(modifiers)
+                            && App::get_key_code(key_code).to_ascii_uppercase() == letter
+                        {
+                            assert!(letter.is_uppercase());
                             self.current_letter += 1;
                         }
                     }
