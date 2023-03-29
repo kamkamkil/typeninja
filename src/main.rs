@@ -1,26 +1,88 @@
-use iced::keyboard::KeyCode;
-use iced::pure::widget::{Button, Column, Container, Row, Text};
-use iced::pure::{Application, Element};
-use iced::{executor, Command, Settings};
+use std::env;
+
+use iced::keyboard::{self, KeyCode};
+use iced::widget::{Button, Column, Container, Row, Text};
+use iced::{executor, Color, Command, Renderer, Settings, Subscription};
+use iced::{subscription, Application, Element, Event};
 
 fn main() -> Result<(), iced::Error> {
+    env::set_var("RUST_BACKTRACE", "full");
     App::run(Settings::default())
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Message {
-    nextKey: char,
+#[derive(Debug, Clone)]
+pub enum Message {
+    Event(Event),
 }
 
-struct App;
+struct App {
+    text: String,
+    current_letter: usize,
+}
+
+impl App {
+    fn new() -> App {
+        App {
+            text: String::from("hello world"),
+            current_letter: 0,
+        }
+    }
+
+    fn render_text(&self) -> iced_native::widget::Row<'static, Message, Renderer> {
+        let mut row = Row::new();
+        let (typed, to_type) = self.text.split_at(self.current_letter);
+
+        let row = row.push(Text::new(String::from(typed)).style(Color::from([1., 0.5, 0.5])));
+        let row = row.push(Text::new(String::from(to_type)).style(Color::from([0., 1., 0.5])));
+        // for letter in self.text.chars() {
+            // row = row.push(Text::new(String::from(letter)));
+        // }
+        row
+    }
+
+    fn get_key_code(key_code: keyboard::KeyCode) -> char {
+        match key_code {
+            KeyCode::A => 'a',
+            KeyCode::B => 'b',
+            KeyCode::C => 'c',
+            KeyCode::D => 'f',
+            KeyCode::E => 'e',
+            KeyCode::F => 'f',
+            KeyCode::G => 'g',
+            KeyCode::H => 'h',
+            KeyCode::I => 'i',
+            KeyCode::J => 'j',
+            KeyCode::K => 'k',
+            KeyCode::L => 'l',
+            KeyCode::M => 'm',
+            KeyCode::N => 'n',
+            KeyCode::O => 'o',
+            KeyCode::P => 'p',
+            KeyCode::Q => 'q',
+            KeyCode::R => 'r',
+            KeyCode::S => 's',
+            KeyCode::T => 't',
+            KeyCode::U => 'u',
+            KeyCode::V => 'v',
+            KeyCode::W => 'w',
+            KeyCode::X => 'x',
+            KeyCode::Y => 'y',
+            KeyCode::Z => 'z',
+            KeyCode::Space => ' ',
+
+            _ => '?',
+        }
+    }
+}
 
 impl Application for App {
     type Executor = executor::Default;
     type Flags = ();
     type Message = Message;
+    type Theme = iced::Theme;
 
     fn new(flags: Self::Flags) -> (App, iced::Command<Self::Message>) {
-        (App, Command::none())
+        (App::new(), Command::none())
     }
 
     fn title(&self) -> String {
@@ -28,79 +90,38 @@ impl Application for App {
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
-        todo!()
+        match message {
+            Message::Event(event) => match event {
+                Event::Keyboard(keyboard_event) => match keyboard_event {
+                    keyboard::Event::KeyPressed {
+                        key_code,
+                        modifiers,
+                    } => {
+                        if App::get_key_code(key_code)
+                            == self.text.chars().nth(self.current_letter).unwrap()
+                        {
+                            self.current_letter += 1;
+                        }
+                    }
+                    _ => (),
+                },
+                _ => (),
+            },
+        }
+
+        Command::none()
     }
 
-    fn view(&self) -> iced::pure::Element<'_, Self::Message> {
-        let a = Text::new("a");
-        let b = Text::new("b");
-        let c = Text::new("c");
-        let row = Row::new().push(a).push(b).push(c);
-        let counter_layout = Container::new(row)
+    fn view(&self) -> iced::Element<'_, Self::Message> {
+        let counter_layout = Container::new(self.render_text())
             .center_x()
             .center_y()
             .width(iced::Length::Fill)
             .height(iced::Length::Fill);
         counter_layout.into()
     }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        subscription::events().map(Message::Event)
+    }
 }
-
-
-// struct Counter {
-//     count: i32,
-//     current_view: Views,
-//     main_page: MainPage,
-// }
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum Views {
-//     Counter,
-//     Main,
-// }
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum CounterMessage {
-//     Increment,
-//     Decrement,
-//     ChangePage(Views),
-// }
-
-// impl Application  for Counter {
-//     type Message = CounterMessage;
-
-//     fn new() -> Self {
-//         Counter {
-//             count: 0,
-//             current_view: Views::Counter,
-//             main_page: MainPage::new(),
-//         }
-//     }
-
-//     fn title(&self) -> String {
-//         String::from("Counter app")
-//     }
-
-//     fn update(&mut self, message: Self::Message) {
-//         match message {
-//             CounterMessage::Increment => self.count += 1,
-//             CounterMessage::Decrement => self.count -= 1,
-//             CounterMessage::ChangePage(view) => self.current_view = view,
-//         }
-//     }
-
-//     fn view(&self) -> iced::pure::Element<Self::Message> {
-//         let a = Text::new("a");
-//         let b = Text::new("b");
-//         let c = Text::new("c");
-//         let row = Row::new().push(a).push(b).push(c);
-//         let counter_layout = Container::new(row)
-//             .center_x()
-//             .center_y()
-//             .width(iced::Length::Fill)
-//             .height(iced::Length::Fill);
-//         match self.current_view {
-//             Views::Counter => counter_layout.into(),
-//             Views::Main => self.main_page.view(),
-//         }
-//     }
-// }
