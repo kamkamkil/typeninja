@@ -12,8 +12,8 @@ fn main() -> Result<(), iced::Error> {
 }
 
 pub struct TextStorage {
-    text: Vec<TextType>,
-    toType: String
+    typed: Vec<TextType>,
+    toType: String,
 }
 //TODO: dodać testy
 //TODO: przenieść do modułu
@@ -21,75 +21,75 @@ impl TextStorage {
     fn new(text: String) -> TextStorage {
         TextStorage {
             toType: text,
-            text: Vec::new(),
+            typed: Vec::new(),
         }
     }
-    
-    fn type_letter(&mut self, letter: char) {
-        let mut iter = self.text.iter_mut().rev();
-        if let Some(part_of_text) = iter.next() {
+
+    fn type_letter(&mut self, letter: char) -> bool {
+        if self.toType.is_empty() {
+            return true;
+        }
+        if self.is_letter_correct(letter) {
+            self.typed_correctly(letter);
+        } else {
+            self.typed_wrongly(letter);
+        }
+        false
+    }
+
+    fn is_letter_correct(&self, letter: char) -> bool {
+        self.toType.starts_with(letter)
+    }
+
+    fn typed_wrongly(&mut self, letter: char) {
+        if let Some(part_of_text) = self.typed.iter_mut().last() {
             match part_of_text {
-                TextType::ToType(typed) => {
-                    if typed.starts_with(letter) {
-                        typed.remove(0);
-                        match iter.next() {
-                            Some(TextType::Typed(t)) => t.push(letter),
-                            Some(TextType::Error(_)) => self
-                                .text
-                                .insert(self.text.len() - 1, TextType::Typed(String::from(letter))),
-                            Some(TextType::ToType(a)) => println!("pojawił się błąd w type_letter 1 {}",a),
-                            None => self.text.insert(0, TextType::Typed(String::from(letter))),
-                        }
-                    }
-                    else{
-                        //tutaj trzeba przewidizeń sytuację kiedy pierwsza litera jest błędna 
-                        match iter.next() {
-                            Some(TextType::Error(t)) => t.push(letter),
-                            Some(TextType::Typed(_)) => self
-                                .text
-                                .insert(self.text.len() - 1, TextType::Error(String::from(letter))),
-                            Some(TextType::ToType(a)) => println!("pojawił się błąd w type_letter 14 {}",a),
-                            None => self.text.insert(0, TextType::Typed(String::from(letter))),
-                        }
-                    }
-                }
-                TextType::Error(q) => println!("pojawił się błąd w type_letter 2 {}" ,q),
-                TextType::Typed(q) => println!("pojawił się błąd w type_letter 3 {}" , q),
+                TextType::Typed(_) => self.typed.push(TextType::Error(String::from(letter))),
+                TextType::Error(t) => t.push(letter),
             }
+        } else {
+            self.typed.push(TextType::Error(String::from(letter)))
         }
     }
-// to musi nie tyklko usunąc ale też dodać do totype
+
+    fn typed_correctly(&mut self, letter: char) {
+        if let Some(part_of_text) = self.typed.iter_mut().last() {
+            match part_of_text {
+                TextType::Error(_) => self.typed.push(TextType::Typed(String::from(letter))),
+                TextType::Typed(t) => t.push(letter),
+            }
+        } else {
+            self.typed.push(TextType::Typed(String::from(letter)))
+        }
+        self.toType = String::from(&self.toType[1..]);
+    }
+    // to musi nie tyklko usunąc ale też dodać do totype
     fn back_space(&mut self) {
-        if let Some(end) = self.text.iter_mut().rev().nth(1) {
-            match end {
-                TextType::Typed(letter) | TextType::ToType(letter) => {
-                    letter.pop();
+        if let Some(part_of_text) = self.typed.iter_mut().last() {
+            match part_of_text {
+                TextType::Error(t) => {
+                    t.pop();
+                    if t.is_empty() {
+                        self.typed.pop();
+                    }
                 }
-                TextType::Error(letter) => {
-                    letter.pop();
-                    if end.is_empty() {
-                        self.text.pop();
-                    };
+                TextType::Typed(t) => {
+                    if let Some(letter) = t.pop() {
+                        self.toType.insert(0, letter);
+                        if t.is_empty() {
+                            self.typed.pop();
+                        }
+                    }
                 }
-            };
+            }
         }
     }
 }
 enum TextType {
     Typed(String),
-    ToType(String),
     Error(String),
 }
 
-impl TextType {
-    fn is_empty(&self) -> bool {
-        match self {
-            TextType::Typed(text) | TextType::ToType(text) | TextType::Error(text) => {
-                text.is_empty()
-            }
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -132,23 +132,21 @@ impl App {
             text: TextStorage::new(String::from("hello world")),
         }
     }
-    //TODO: add | and mayby change some var names 
+    //TODO: add | and mayby change some var names
     fn render_text(&self) -> iced_native::widget::Row<'static, Message, Renderer> {
         let mut row = Row::new();
-        for text in &self.text.text {
+        for text in &self.text.typed {
             match text {
                 TextType::Typed(text) => {
                     row = row.push(Text::new(String::from(text)).style(self.text_style.typed_color))
-                }
-                TextType::ToType(text) => {
-                    row =
-                        row.push(Text::new(String::from(text)).style(self.text_style.to_type_color))
                 }
                 TextType::Error(text) => {
                     row = row.push(Text::new(String::from(text)).style(self.text_style.error_color))
                 }
             }
         }
+        row = row
+            .push(Text::new(String::from(&self.text.toType)).style(self.text_style.to_type_color));
         row
     }
 
@@ -213,11 +211,13 @@ impl Application for App {
                     let typed_key = App::get_key_code(key_code);
                     match typed_key {
                         KeyType::Letter(typed_char) => {
-                            if !keyboard::Modifiers::shift(modifiers) {
-                                self.text.type_letter(typed_char);
-                            }else if keyboard::Modifiers::shift(modifiers) {
-                                self.text.type_letter(typed_char.to_ascii_uppercase());
-                                
+                           let text_done =  if !keyboard::Modifiers::shift(modifiers) {
+                                self.text.type_letter(typed_char)
+                            } else if keyboard::Modifiers::shift(modifiers) {
+                                self.text.type_letter(typed_char.to_ascii_uppercase())
+                            } else {false};
+                            if text_done {
+                                self.view = Views::Results;
                             }
                         }
                         KeyType::BackSpace => {
