@@ -1,95 +1,24 @@
 use std::env;
 
 use iced::keyboard::{self, KeyCode};
-use iced::widget::{Button, Column, Container, Row, Text};
+use iced::widget::{Container, Row, Text,Button};
 use iced::{executor, Color, Command, Renderer, Settings, Subscription};
-use iced::{subscription, Application, Element, Event};
-use std::time::{Duration, Instant};
+use iced::{subscription, Application, Event};
 
 fn main() -> Result<(), iced::Error> {
     env::set_var("RUST_BACKTRACE", "full");
     App::run(Settings::default())
 }
 
-pub struct TextStorage {
-    typed: Vec<TextType>,
-    toType: String,
-}
-//TODO: dodać testy
-//TODO: przenieść do modułu
-impl TextStorage {
-    fn new(text: String) -> TextStorage {
-        TextStorage {
-            toType: text,
-            typed: Vec::new(),
-        }
-    }
+pub(crate) mod textStorage;
 
-    fn type_letter(&mut self, letter: char) -> bool {
-        if self.toType.is_empty() {
-            return true;
-        }
-        if self.is_letter_correct(letter) {
-            self.typed_correctly(letter);
-        } else {
-            self.typed_wrongly(letter);
-        }
-        false
-    }
+struct MainPage{}
 
-    fn is_letter_correct(&self, letter: char) -> bool {
-        self.toType.starts_with(letter)
-    }
-
-    fn typed_wrongly(&mut self, letter: char) {
-        if let Some(part_of_text) = self.typed.iter_mut().last() {
-            match part_of_text {
-                TextType::Typed(_) => self.typed.push(TextType::Error(String::from(letter))),
-                TextType::Error(t) => t.push(letter),
-            }
-        } else {
-            self.typed.push(TextType::Error(String::from(letter)))
-        }
-    }
-
-    fn typed_correctly(&mut self, letter: char) {
-        if let Some(part_of_text) = self.typed.iter_mut().last() {
-            match part_of_text {
-                TextType::Error(_) => self.typed.push(TextType::Typed(String::from(letter))),
-                TextType::Typed(t) => t.push(letter),
-            }
-        } else {
-            self.typed.push(TextType::Typed(String::from(letter)))
-        }
-        self.toType = String::from(&self.toType[1..]);
-    }
-    // to musi nie tyklko usunąc ale też dodać do totype
-    fn back_space(&mut self) {
-        if let Some(part_of_text) = self.typed.iter_mut().last() {
-            match part_of_text {
-                TextType::Error(t) => {
-                    t.pop();
-                    if t.is_empty() {
-                        self.typed.pop();
-                    }
-                }
-                TextType::Typed(t) => {
-                    if let Some(letter) = t.pop() {
-                        self.toType.insert(0, letter);
-                        if t.is_empty() {
-                            self.typed.pop();
-                        }
-                    }
-                }
-            }
-        }
+impl MainPage {
+    fn create() {
+        
     }
 }
-enum TextType {
-    Typed(String),
-    Error(String),
-}
-
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -101,6 +30,7 @@ struct TextStyle {
     typed_color: Color,
     error_color: Color,
     to_type_color: Color,
+    couros_color: Color,
 }
 enum KeyType {
     Letter(char),
@@ -112,12 +42,13 @@ enum KeyType {
 pub enum Views {
     TypingPage,
     Results,
+    MainPage,
 }
 
 struct App {
     view: Views,
     text_style: TextStyle,
-    text: TextStorage,
+    text: textStorage::TextStorage,
 }
 
 impl App {
@@ -128,8 +59,9 @@ impl App {
                 typed_color: Color::from([0., 0., 0.]),
                 error_color: Color::from([1., 0.2, 0.2]),
                 to_type_color: Color::from([0.7, 0.7, 0.7]),
+                couros_color: Color::from([0., 0., 0.]),
             },
-            text: TextStorage::new(String::from("hello world")),
+            text: textStorage::TextStorage::new(String::from("hello world")),
         }
     }
     //TODO: add | and mayby change some var names
@@ -137,14 +69,16 @@ impl App {
         let mut row = Row::new();
         for text in &self.text.typed {
             match text {
-                TextType::Typed(text) => {
+                textStorage::TextType::Typed(text) => {
                     row = row.push(Text::new(String::from(text)).style(self.text_style.typed_color))
                 }
-                TextType::Error(text) => {
+                textStorage::TextType::Error(text) => {
                     row = row.push(Text::new(String::from(text)).style(self.text_style.error_color))
                 }
             }
         }
+        row = row.push(Text::new(String::from('|')).style(self.text_style.couros_color));
+
         row = row
             .push(Text::new(String::from(&self.text.toType)).style(self.text_style.to_type_color));
         row
@@ -211,11 +145,13 @@ impl Application for App {
                     let typed_key = App::get_key_code(key_code);
                     match typed_key {
                         KeyType::Letter(typed_char) => {
-                           let text_done =  if !keyboard::Modifiers::shift(modifiers) {
+                            let text_done = if !keyboard::Modifiers::shift(modifiers) {
                                 self.text.type_letter(typed_char)
                             } else if keyboard::Modifiers::shift(modifiers) {
                                 self.text.type_letter(typed_char.to_ascii_uppercase())
-                            } else {false};
+                            } else {
+                                false
+                            };
                             if text_done {
                                 self.view = Views::Results;
                             }
@@ -246,6 +182,7 @@ impl Application for App {
                 .center_y()
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill),
+            Views::MainPage => todo!(),
         };
         layout.into()
     }
@@ -254,3 +191,4 @@ impl Application for App {
         subscription::events().map(Message::Event)
     }
 }
+
