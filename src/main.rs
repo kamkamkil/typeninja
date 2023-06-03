@@ -1,10 +1,10 @@
 use std::env;
 
 use iced::keyboard::{self, KeyCode};
-use iced::widget::{Container, Row, Text,Button};
+use iced::widget::{Button, Container, Row, Text};
 use iced::{executor, Color, Command, Renderer, Settings, Subscription};
 use iced::{subscription, Application, Event};
-
+use std::time::{self, Duration, Instant};
 fn main() -> Result<(), iced::Error> {
     env::set_var("RUST_BACKTRACE", "full");
     App::run(Settings::default())
@@ -12,12 +12,10 @@ fn main() -> Result<(), iced::Error> {
 
 pub(crate) mod textStorage;
 
-struct MainPage{}
+struct MainPage {}
 
 impl MainPage {
-    fn create() {
-        
-    }
+    fn create() {}
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +118,33 @@ impl App {
     }
 }
 
+struct Time {
+    second: u64,
+    minute: u64,
+}
+
+struct Timer {
+    beginng: Instant,
+}
+
+impl Timer {
+    fn new() -> Timer {
+        Timer { beginng: std::time::Instant::now() }
+    }
+    fn start(&mut self) {
+        self.beginng = std::time::Instant::now();
+    }
+
+    fn time_elapsed(&self) -> Time {
+        let now = Instant::now();
+        let time_elapsed = self.beginng.elapsed().as_secs();
+        Time {
+            second: time_elapsed - time_elapsed % 60,
+            minute: time_elapsed % 60,
+        }
+    }
+}
+
 impl Application for App {
     type Executor = executor::Default;
     type Flags = ();
@@ -191,4 +216,3 @@ impl Application for App {
         subscription::events().map(Message::Event)
     }
 }
-
