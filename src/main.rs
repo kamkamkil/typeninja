@@ -1,15 +1,17 @@
 use std::env;
 
+use chrono::prelude::*;
 use iced::keyboard::{self, KeyCode};
 use iced::widget::{Button, Container, Row, Text};
 use iced::{executor, Color, Command, Renderer, Settings, Subscription};
 use iced::{subscription, Application, Event};
-use std::time::{self, Duration, Instant};
 fn main() -> Result<(), iced::Error> {
     env::set_var("RUST_BACKTRACE", "full");
     App::run(Settings::default())
 }
 
+mod MainMenu;
+mod style;
 pub(crate) mod textStorage;
 
 struct MainPage {}
@@ -22,14 +24,9 @@ impl MainPage {
 pub enum Message {
     Event(Event),
     GoToResults,
+    Tick(chrono::DateTime<Utc>),
 }
 
-struct TextStyle {
-    typed_color: Color,
-    error_color: Color,
-    to_type_color: Color,
-    couros_color: Color,
-}
 enum KeyType {
     Letter(char),
     BackSpace,
@@ -45,26 +42,36 @@ pub enum Views {
 
 struct App {
     view: Views,
-    text_style: TextStyle,
+    text_style: style::TextStyle,
     text: textStorage::TextStorage,
+    timer: Timer,
 }
 
 impl App {
     fn new() -> App {
         App {
             view: Views::TypingPage,
-            text_style: TextStyle {
+            text_style: style::TextStyle {
                 typed_color: Color::from([0., 0., 0.]),
                 error_color: Color::from([1., 0.2, 0.2]),
                 to_type_color: Color::from([0.7, 0.7, 0.7]),
                 couros_color: Color::from([0., 0., 0.]),
             },
             text: textStorage::TextStorage::new(String::from("hello world")),
+            timer: Timer::new(),
         }
     }
     //TODO: add | and mayby change some var names
     fn render_text(&self) -> iced_native::widget::Row<'static, Message, Renderer> {
         let mut row = Row::new();
+        // println!(
+        //     "time elapsed : {}",
+        //     self.timer.time_elapsed.second.to_string()
+        // ); // add here some way to anable logging
+        row = row.push(
+            Text::new(self.timer.time_elapsed.second.to_string())
+                .style(self.text_style.typed_color),
+        );
         for text in &self.text.typed {
             match text {
                 textStorage::TextType::Typed(text) => {
@@ -118,29 +125,37 @@ impl App {
     }
 }
 
+#[derive(Debug, Clone,Copy)]
 struct Time {
-    second: u64,
-    minute: u64,
+    second: i64,
+    minute: i64,
 }
 
 struct Timer {
-    beginng: Instant,
+    beginng: chrono::DateTime<Utc>,
+    time_elapsed: Time,
 }
 
 impl Timer {
     fn new() -> Timer {
-        Timer { beginng: std::time::Instant::now() }
+        Timer {
+            beginng: Utc::now(),
+            time_elapsed: Time {
+                second: 0,
+                minute: 0,
+            },
+        }
     }
     fn start(&mut self) {
-        self.beginng = std::time::Instant::now();
+        self.beginng = Utc::now();
     }
 
-    fn time_elapsed(&self) -> Time {
-        let now = Instant::now();
-        let time_elapsed = self.beginng.elapsed().as_secs();
-        Time {
-            second: time_elapsed - time_elapsed % 60,
-            minute: time_elapsed % 60,
+
+    fn update_timer(&mut self, now: chrono::DateTime<Utc>) {
+        let elapsed = now - self.beginng;
+        self.time_elapsed = Time {
+            second: elapsed.num_seconds(),
+            minute: elapsed.num_minutes(),
         }
     }
 }
@@ -191,6 +206,9 @@ impl Application for App {
                 _ => (),
             },
             Message::GoToResults => self.view = Views::Results,
+            Message::Tick(time) => {
+                self.timer.update_timer(time);
+            }
         };
         Command::none()
     }
@@ -212,7 +230,11 @@ impl Application for App {
         layout.into()
     }
 
-    fn subscription(&self) -> Subscription<Self::Message> {
-        subscription::events().map(Message::Event)
+    fn subscription(&self) -> Subscription<Message> {
+        iced::Subscription::batch(vec![
+            iced::time::every(std::time::Duration::from_millis(500))
+                .map(|_| Message::Tick(Utc::now())),
+            subscription::events().map(Message::Event),
+        ])
     }
 }
