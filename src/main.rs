@@ -2,9 +2,11 @@ use std::env;
 
 use chrono::prelude::*;
 use iced::keyboard::{self, KeyCode};
-use iced::widget::{Button, Container, Row, Text};
+use iced::widget::canvas::{Cache, Path};
+use iced::widget::{canvas, Button, Canvas, Container, Row, Text};
 use iced::{executor, Color, Command, Renderer, Settings, Subscription};
 use iced::{subscription, Application, Event};
+use iced_native::Point;
 fn main() -> Result<(), iced::Error> {
     env::set_var("RUST_BACKTRACE", "full");
     App::run(Settings::default())
@@ -13,11 +15,42 @@ fn main() -> Result<(), iced::Error> {
 mod MainMenu;
 mod style;
 pub(crate) mod textStorage;
+mod time;
 
 struct MainPage {}
 
 impl MainPage {
     fn create() {}
+}
+
+struct Graph {}
+
+impl canvas::Program<Message> for Graph {
+    type State = ();
+
+    fn draw(
+        &self,
+        state: &Self::State,
+        theme: &iced::Theme,
+        bounds: iced_native::Rectangle,
+        cursor: canvas::Cursor,
+    ) -> Vec<canvas::Geometry> {
+        let mut  result: Vec<canvas::Geometry> = vec![];
+        let g: Cache = canvas::Cache::default();
+        let p = g.draw(bounds.size(), |frame| {
+            let t =  Path::circle( frame.center(),10.0);
+            frame.fill(&t, Color::from_rgb8(0xF9, 0xD7, 0x1C));
+
+        });
+        result.push(p);
+        result
+    }
+}
+
+impl Graph {
+    fn new() -> Graph {
+        Graph {}
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +77,7 @@ struct App {
     view: Views,
     text_style: style::TextStyle,
     text: textStorage::TextStorage,
-    timer: Timer,
+    timer: time::Timer,
 }
 
 impl App {
@@ -57,8 +90,8 @@ impl App {
                 to_type_color: Color::from([0.7, 0.7, 0.7]),
                 couros_color: Color::from([0., 0., 0.]),
             },
-            text: textStorage::TextStorage::new(String::from("hello world")),
-            timer: Timer::new(),
+            text: textStorage::TextStorage::new(String::from("h")),
+            timer: time::Timer::new(),
         }
     }
     //TODO: add | and mayby change some var names
@@ -85,10 +118,10 @@ impl App {
         row = row.push(Text::new(String::from('|')).style(self.text_style.couros_color));
 
         row = row
-            .push(Text::new(String::from(&self.text.toType)).style(self.text_style.to_type_color));
+            .push(Text::new(String::from(&self.text.to_type)).style(self.text_style.to_type_color));
         row
     }
-
+    //todo add to textStorage
     fn get_key_code(key_code: keyboard::KeyCode) -> KeyType {
         match key_code {
             KeyCode::A => KeyType::Letter('a'),
@@ -125,41 +158,6 @@ impl App {
     }
 }
 
-#[derive(Debug, Clone,Copy)]
-struct Time {
-    second: i64,
-    minute: i64,
-}
-
-struct Timer {
-    beginng: chrono::DateTime<Utc>,
-    time_elapsed: Time,
-}
-
-impl Timer {
-    fn new() -> Timer {
-        Timer {
-            beginng: Utc::now(),
-            time_elapsed: Time {
-                second: 0,
-                minute: 0,
-            },
-        }
-    }
-    fn start(&mut self) {
-        self.beginng = Utc::now();
-    }
-
-
-    fn update_timer(&mut self, now: chrono::DateTime<Utc>) {
-        let elapsed = now - self.beginng;
-        self.time_elapsed = Time {
-            second: elapsed.num_seconds(),
-            minute: elapsed.num_minutes(),
-        }
-    }
-}
-
 impl Application for App {
     type Executor = executor::Default;
     type Flags = ();
@@ -186,13 +184,15 @@ impl Application for App {
                     match typed_key {
                         KeyType::Letter(typed_char) => {
                             let text_done = if !keyboard::Modifiers::shift(modifiers) {
-                                self.text.type_letter(typed_char)
+                                self.text.type_letter(typed_char, self.timer)
                             } else if keyboard::Modifiers::shift(modifiers) {
-                                self.text.type_letter(typed_char.to_ascii_uppercase())
+                                self.text
+                                    .type_letter(typed_char.to_ascii_uppercase(), self.timer)
                             } else {
                                 false
                             };
                             if text_done {
+                                self.text.print();
                                 self.view = Views::Results;
                             }
                         }
@@ -220,11 +220,18 @@ impl Application for App {
                 .center_y()
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill),
-            Views::Results => Container::new(Text::new("wow udałos się"))
-                .center_x()
-                .center_y()
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill),
+            Views::Results => {
+                Container::new(iced::widget::row![Canvas::new(Graph {})]) //todo refractoring
+                    .center_x()
+                    .center_y()
+                    .width(iced::Length::Fill)
+                    .height(iced::Length::Fill)
+            }
+            // Views::Results => Container::new(Text::new("wow udałos się"))
+            //     .center_x()
+            //     .center_y()
+            //     .width(iced::Length::Fill)
+            //     .height(iced::Length::Fill),
             Views::MainPage => todo!(),
         };
         layout.into()
