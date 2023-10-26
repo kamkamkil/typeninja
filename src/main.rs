@@ -2,7 +2,7 @@ use std::env;
 
 use chrono::prelude::*;
 use iced::keyboard::{self, KeyCode};
-use iced::widget::canvas::{Cache, Path};
+use iced::widget::canvas::{Cache, Path, Frame, Stroke, stroke, LineCap};
 use iced::widget::{canvas, Button, Canvas, Container, Row, Text};
 use iced::{executor, Color, Command, Renderer, Settings, Subscription};
 use iced::{subscription, Application, Event};
@@ -22,8 +22,11 @@ struct MainPage {}
 impl MainPage {
     fn create() {}
 }
-
-struct Graph {}
+//todo move to dirent file 
+struct Graph {
+    y_axis: Vec<i32>,
+    x_axis: Vec<i32>,
+}
 
 impl canvas::Program<Message> for Graph {
     type State = ();
@@ -38,19 +41,58 @@ impl canvas::Program<Message> for Graph {
         let mut  result: Vec<canvas::Geometry> = vec![];
         let g: Cache = canvas::Cache::default();
         let p = g.draw(bounds.size(), |frame| {
+            
+            //todo move to new func 
+            //todo cheange so it works for less then zero 
+            //todo add implementation for floating point 
+            //todo add styling
+            //todo add graph soothing 
+            //todo add padding
+            //todo add legend 
+            if self.x_axis.len() == self.y_axis.len() {
+                let y_scale = bounds.size().height / *self.y_axis.iter().max().unwrap() as f32;
+                let x_scale = bounds.size().width / *self.x_axis.iter().max().unwrap() as f32;
+                for (i,y) in self.y_axis.iter().enumerate()  {
+                    let p =  Path::circle(  Point { x: x_scale * self.x_axis[i] as f32, y: y_scale * *y as f32 },5.0);
+                    frame.fill(&p, Color::from_rgb8(0x00, 0xD7, 0x1C));
+                    if i > 0 {
+                        let l = Path::line(self.get_nth_point(i - 1, y_scale, x_scale),self.get_nth_point(i, y_scale, x_scale));
+                        
+                        let wide_stroke = || -> Stroke {
+                            Stroke {
+                                width:  3.0,
+                                style: stroke::Style::Solid(Color::BLACK),
+                                line_cap: LineCap::Round,
+                                ..Stroke::default()
+                            }
+                        };
+                        frame.stroke(&l, wide_stroke());
+                    }
+                    
+                }
+            }
+
+
             let t =  Path::circle( frame.center(),10.0);
-            frame.fill(&t, Color::from_rgb8(0xF9, 0xD7, 0x1C));
+            frame.fill(&t, Color::from_rgb8(0x00, 0xD7, 0x1C));
 
         });
+        println!("h :{:?} w : {:?}",bounds.size().height,bounds.size().width);
         result.push(p);
         result
     }
 }
 
 impl Graph {
-    fn new() -> Graph {
-        Graph {}
+    fn new(y_axis: Vec<i32>,x_axis: Vec<i32>) -> Graph {
+        Graph { y_axis, x_axis }
     }
+
+    fn get_nth_point(&self,n : usize, y_scale : f32,x_scale : f32) ->Point
+    {
+        Point { x: x_scale * self.x_axis[n] as f32, y: y_scale * self.y_axis[n] as f32 }
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -221,7 +263,8 @@ impl Application for App {
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill),
             Views::Results => {
-                Container::new(iced::widget::row![Canvas::new(Graph {})]) //todo refractoring
+                //todo refractoring
+                Container::new(Canvas::new(Graph::new(vec![1,2,3,4,5,7,5,3,3,1,2,7],vec![1,2,3,4,5,6,7,8,9,10,11,12])).width(iced::Length::Fill).height(iced::Length::Fill)) 
                     .center_x()
                     .center_y()
                     .width(iced::Length::Fill)
